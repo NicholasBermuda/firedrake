@@ -1,7 +1,6 @@
 # A module implementing strong (Dirichlet) boundary conditions.
 from __future__ import absolute_import, print_function, division
-from six.moves import map, range
-import numpy as np
+from six.moves import map
 from ufl import as_ufl, SpatialCoordinate, UFLException
 from ufl.algorithms.analysis import has_type
 
@@ -162,25 +161,7 @@ class DirichletBC(object):
     def nodes(self):
         '''The list of nodes at which this boundary condition applies.'''
 
-        fs = self._function_space
-        if self.sub_domain == "bottom":
-            return fs.bottom_nodes(method=self.method)
-        elif self.sub_domain == "top":
-            return fs.top_nodes(method=self.method)
-        else:
-            if fs.extruded:
-                base_maps = fs.exterior_facet_boundary_node_map(
-                    self.method).values_with_halo.take(
-                    fs._mesh._base_mesh.exterior_facets.subset(self.sub_domain).indices,
-                    axis=0)
-                facet_offset = fs.exterior_facet_boundary_node_map(self.method).offset
-                return np.unique(np.concatenate([base_maps + i * facet_offset
-                                                 for i in range(fs._mesh.layers - 1)]))
-            return np.unique(
-                fs.exterior_facet_boundary_node_map(
-                    self.method).values_with_halo.take(
-                    fs._mesh.exterior_facets.subset(self.sub_domain).indices,
-                    axis=0))
+        return self._function_space.boundary_nodes(self.sub_domain, self.method)
 
     @utils.cached_property
     def node_set(self):
