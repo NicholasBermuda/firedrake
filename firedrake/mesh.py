@@ -339,13 +339,15 @@ class MeshTopology(object):
     """A representation of mesh topology."""
 
     @timed_function("CreateMesh")
-    def __init__(self, plex, name, reorder, distribute):
+    def __init__(self, plex, name, reorder, distribute, partitioning=None):
         """Half-initialise a mesh topology.
 
         :arg plex: :class:`DMPlex` representing the mesh topology
         :arg name: name of the mesh
         :arg reorder: whether to reorder the mesh (bool)
         :arg distribute: whether to distribute the mesh to parallel processes
+        :kwarg partitioning: provide a cell partition for running in
+            parallel (useful for debugging, but not necessary).
         """
         # Do some validation of the input mesh
         dmplex.validate_mesh(plex)
@@ -376,6 +378,10 @@ class MeshTopology(object):
             if IntType.itemsize == 8:
                 # Default to Parmetis on 64bit ints (Chaco is 32 bit int only)
                 partitioner.setType(partitioner.Type.PARMETIS)
+            if partitioning is not None:
+                sizes, points = partitioning
+                partitioner.setType(partitioner.Type.SHELL)
+                partitioner.setShellPartition(self.comm.size, sizes, points)
             partitioner.setFromOptions()
             plex.distribute(overlap=0)
 
@@ -1252,6 +1258,8 @@ def Mesh(meshfile, **kwargs):
            meshes for better cache locality.  If not supplied the
            default value in ``parameters["reorder_meshes"]``
            is used.
+    :param partitioning: a partitioning of the cells amongst processes
+           (only really useful for debugging numbering issues).
     :param comm: the communicator to use when creating the mesh.  If
            not supplied, then the mesh will be created on COMM_WORLD.
            Ignored if ``meshfile`` is a DMPlex object (in which case
@@ -1294,6 +1302,8 @@ def Mesh(meshfile, **kwargs):
         reorder = parameters["reorder_meshes"]
     distribute = kwargs.get("distribute", True)
 
+    partitioning = kwargs.get("partitioning", None)
+
     if isinstance(meshfile, PETSc.DMPlex):
         name = "plexmesh"
         plex = meshfile
@@ -1315,7 +1325,8 @@ def Mesh(meshfile, **kwargs):
                                % (meshfile, ext[1:]))
 
     # Create mesh topology
-    topology = MeshTopology(plex, name=name, reorder=reorder, distribute=distribute)
+    topology = MeshTopology(plex, name=name, reorder=reorder, distribute=distribute,
+                            partitioning=partitioning)
 
     tcell = topology.ufl_cell()
     if geometric_dim is None:

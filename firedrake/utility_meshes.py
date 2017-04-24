@@ -27,7 +27,7 @@ __all__ = ['IntervalMesh', 'UnitIntervalMesh',
            'TorusMesh', 'CylinderMesh']
 
 
-def IntervalMesh(ncells, length_or_left, right=None, comm=COMM_WORLD):
+def IntervalMesh(ncells, length_or_left, right=None, partitioning=None, comm=COMM_WORLD):
     """
     Generate a uniform mesh of an interval.
 
@@ -37,6 +37,8 @@ def IntervalMesh(ncells, length_or_left, right=None, comm=COMM_WORLD):
     :arg right: (optional) position of the right
          boundary point (in which case ``length_or_left`` should
          be the left boundary point).
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -72,14 +74,16 @@ def IntervalMesh(ncells, length_or_left, right=None, comm=COMM_WORLD):
         if vcoord[0] == coords[-1]:
             plex.setLabelValue("boundary_ids", v, 2)
 
-    return mesh.Mesh(plex, reorder=False)
+    return mesh.Mesh(plex, reorder=False, partitioning=partitioning)
 
 
-def UnitIntervalMesh(ncells, comm=COMM_WORLD):
+def UnitIntervalMesh(ncells, partitioning=None, comm=COMM_WORLD):
     """
     Generate a uniform mesh of the interval [0,1].
 
     :arg ncells: The number of the cells over the interval.
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -87,14 +91,16 @@ def UnitIntervalMesh(ncells, comm=COMM_WORLD):
     while the right hand (:math:`x=1`) point has marker 2.
     """
 
-    return IntervalMesh(ncells, length_or_left=1.0, comm=comm)
+    return IntervalMesh(ncells, length_or_left=1.0, partitioning=partitioning, comm=comm)
 
 
-def PeriodicIntervalMesh(ncells, length, comm=COMM_WORLD):
+def PeriodicIntervalMesh(ncells, length, partitioning=None, comm=COMM_WORLD):
     """Generate a periodic mesh of an interval.
 
     :arg ncells: The number of cells over the interval.
     :arg length: The length the interval.
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
     """
@@ -103,7 +109,7 @@ def PeriodicIntervalMesh(ncells, length, comm=COMM_WORLD):
         raise ValueError("1D periodic meshes with fewer than 3 \
 cells are not currently supported")
 
-    m = CircleManifoldMesh(ncells, comm=comm)
+    m = CircleManifoldMesh(ncells, partitioning=partitioning, comm=comm)
     coord_fs = VectorFunctionSpace(m, 'DG', 1, dim=1)
     old_coordinates = m.coordinates
     new_coordinates = Function(coord_fs)
@@ -148,17 +154,19 @@ cells are not currently supported")
     return mesh.Mesh(new_coordinates)
 
 
-def PeriodicUnitIntervalMesh(ncells, comm=COMM_WORLD):
+def PeriodicUnitIntervalMesh(ncells, partitioning=None, comm=COMM_WORLD):
     """Generate a periodic mesh of the unit interval
 
     :arg ncells: The number of cells in the interval.
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
     """
-    return PeriodicIntervalMesh(ncells, length=1.0, comm=comm)
+    return PeriodicIntervalMesh(ncells, length=1.0, partitioning=partitioning, comm=comm)
 
 
-def OneElementThickMesh(ncells, Lx, Ly, comm=COMM_WORLD):
+def OneElementThickMesh(ncells, Lx, Ly, partitioning=None, comm=COMM_WORLD):
     """
     Generate a rectangular mesh in the domain with corners [0,0]
     and [Lx, Ly] with ncells, that is periodic in the x-direction.
@@ -166,6 +174,8 @@ def OneElementThickMesh(ncells, Lx, Ly, comm=COMM_WORLD):
     :arg ncells: The number of cells in the mesh.
     :arg Lx: The width of the domain in the x-direction.
     :arg Ly: The width of the domain in the y-direction.
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
     """
@@ -180,7 +190,7 @@ def OneElementThickMesh(ncells, Lx, Ly, comm=COMM_WORLD):
 
     # a line of coordinates, with a looped topology
     plex = mesh._from_cell_list(2, cells, coords, comm)
-    mesh1 = mesh.Mesh(plex)
+    mesh1 = mesh.Mesh(plex, partitioning=partitioning)
     mesh1.topology.init()
     cell_numbering = mesh1._cell_numbering
     cell_range = plex.getHeightStratum(0)
@@ -329,7 +339,7 @@ def UnitTriangleMesh(comm=COMM_WORLD):
 
 
 def RectangleMesh(nx, ny, Lx, Ly, quadrilateral=False, reorder=None,
-                  diagonal="left", comm=COMM_WORLD):
+                  diagonal="left", partitioning=None, comm=COMM_WORLD):
     """Generate a rectangular mesh
 
     :arg nx: The number of cells in the x direction
@@ -396,10 +406,11 @@ def RectangleMesh(nx, ny, Lx, Ly, quadrilateral=False, reorder=None,
             if abs(face_coords[1] - Ly) < ytol and abs(face_coords[3] - Ly) < ytol:
                 plex.setLabelValue("boundary_ids", face, 4)
 
-    return mesh.Mesh(plex, reorder=reorder)
+    return mesh.Mesh(plex, reorder=reorder, partitioning=partitioning)
 
 
-def SquareMesh(nx, ny, L, reorder=None, quadrilateral=False, comm=COMM_WORLD):
+def SquareMesh(nx, ny, L, reorder=None, quadrilateral=False, partitioning=None,
+               comm=COMM_WORLD):
     """Generate a square mesh
 
     :arg nx: The number of cells in the x direction
@@ -419,10 +430,12 @@ def SquareMesh(nx, ny, L, reorder=None, quadrilateral=False, comm=COMM_WORLD):
     """
     return RectangleMesh(nx, ny, L, L, reorder=reorder,
                          quadrilateral=quadrilateral,
+                         partitioning=partitioning,
                          comm=comm)
 
 
-def UnitSquareMesh(nx, ny, reorder=None, quadrilateral=False, comm=COMM_WORLD):
+def UnitSquareMesh(nx, ny, reorder=None, quadrilateral=False, partitioning=None,
+                   comm=COMM_WORLD):
     """Generate a unit square mesh
 
     :arg nx: The number of cells in the x direction
@@ -441,11 +454,13 @@ def UnitSquareMesh(nx, ny, reorder=None, quadrilateral=False, comm=COMM_WORLD):
     """
     return SquareMesh(nx, ny, 1, reorder=reorder,
                       quadrilateral=quadrilateral,
+                      partitioning=partitioning,
                       comm=comm)
 
 
 def PeriodicRectangleMesh(nx, ny, Lx, Ly, direction="both",
-                          quadrilateral=False, reorder=None, comm=COMM_WORLD):
+                          quadrilateral=False, reorder=None,
+                          partitioning=None, comm=COMM_WORLD):
     """Generate a periodic rectangular mesh
 
     :arg nx: The number of cells in the x direction
@@ -456,6 +471,8 @@ def PeriodicRectangleMesh(nx, ny, Lx, Ly, direction="both",
         ``"both"``, ``"x"`` or ``"y"``.
     :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
     :kwarg reorder: (optional), should the mesh be reordered
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -471,7 +488,7 @@ def PeriodicRectangleMesh(nx, ny, Lx, Ly, direction="both",
     """
 
     if direction == "both" and ny == 1 and quadrilateral:
-        return OneElementThickMesh(nx, Lx, Ly)
+        return OneElementThickMesh(nx, Lx, Ly, partitioning=partitioning)
 
     if direction not in ("both", "x", "y"):
         raise ValueError("Cannot have a periodic mesh with periodicity '%s'" % direction)
@@ -479,13 +496,14 @@ def PeriodicRectangleMesh(nx, ny, Lx, Ly, direction="both",
         return PartiallyPeriodicRectangleMesh(nx, ny, Lx, Ly, direction=direction,
                                               quadrilateral=quadrilateral,
                                               reorder=reorder,
+                                              partitioning=partitioning,
                                               comm=comm)
     if nx < 3 or ny < 3:
         raise ValueError("2D periodic meshes with fewer than 3 \
 cells in each direction are not currently supported")
 
     m = TorusMesh(nx, ny, 1.0, 0.5, quadrilateral=quadrilateral, reorder=reorder,
-                  comm=comm)
+                  partitioning=partitioning, comm=comm)
     coord_fs = VectorFunctionSpace(m, 'DG', 1, dim=2)
     old_coordinates = m.coordinates
     new_coordinates = Function(coord_fs)
@@ -540,11 +558,11 @@ for(int i=0; i<new_coords.dofs; i++) {
               "Lx": (cLx, READ),
               "Ly": (cLy, READ)})
 
-    return mesh.Mesh(new_coordinates)
+    return mesh.Mesh(new_coordinates, partitioning=partitioning)
 
 
 def PeriodicSquareMesh(nx, ny, L, direction="both", quadrilateral=False, reorder=None,
-                       comm=COMM_WORLD):
+                       partitioning=None, comm=COMM_WORLD):
     """Generate a periodic square mesh
 
     :arg nx: The number of cells in the x direction
@@ -554,6 +572,8 @@ def PeriodicSquareMesh(nx, ny, L, direction="both", quadrilateral=False, reorder
         ``"both"``, ``"x"`` or ``"y"``.
     :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
     :kwarg reorder: (optional), should the mesh be reordered
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -569,11 +589,12 @@ def PeriodicSquareMesh(nx, ny, L, direction="both", quadrilateral=False, reorder
     """
     return PeriodicRectangleMesh(nx, ny, L, L, direction=direction,
                                  quadrilateral=quadrilateral, reorder=reorder,
+                                 partitioning=partitioning,
                                  comm=comm)
 
 
 def PeriodicUnitSquareMesh(nx, ny, direction="both", reorder=None,
-                           quadrilateral=False, comm=COMM_WORLD):
+                           quadrilateral=False, partitioning=None, comm=COMM_WORLD):
     """Generate a periodic unit square mesh
 
     :arg nx: The number of cells in the x direction
@@ -582,6 +603,8 @@ def PeriodicUnitSquareMesh(nx, ny, direction="both", reorder=None,
         ``"both"``, ``"x"`` or ``"y"``.
     :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
     :kwarg reorder: (optional), should the mesh be reordered
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -597,16 +620,18 @@ def PeriodicUnitSquareMesh(nx, ny, direction="both", reorder=None,
     """
     return PeriodicSquareMesh(nx, ny, 1.0, direction=direction,
                               reorder=reorder, quadrilateral=quadrilateral,
-                              comm=comm)
+                              partitioning=partitioning, comm=comm)
 
 
-def CircleManifoldMesh(ncells, radius=1, comm=COMM_WORLD):
+def CircleManifoldMesh(ncells, radius=1, partitioning=None, comm=COMM_WORLD):
     """Generated a 1D mesh of the circle, immersed in 2D.
 
     :arg ncells: number of cells the circle should be
          divided into (min 3)
     :kwarg radius: (optional) radius of the circle to approximate
            (defaults to 1).
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
     """
@@ -620,7 +645,7 @@ def CircleManifoldMesh(ncells, radius=1, comm=COMM_WORLD):
                              np.roll(np.arange(0, ncells, dtype=np.int32), -1)))
 
     plex = mesh._from_cell_list(1, cells, vertices, comm)
-    m = mesh.Mesh(plex, dim=2, reorder=False)
+    m = mesh.Mesh(plex, dim=2, reorder=False, partitioning=partitioning)
     m._radius = radius
     return m
 
@@ -637,7 +662,7 @@ def UnitTetrahedronMesh(comm=COMM_WORLD):
     return mesh.Mesh(plex, reorder=False)
 
 
-def BoxMesh(nx, ny, nz, Lx, Ly, Lz, reorder=None, comm=COMM_WORLD):
+def BoxMesh(nx, ny, nz, Lx, Ly, Lz, reorder=None, partitioning=None, comm=COMM_WORLD):
     """Generate a mesh of a 3D box.
 
     :arg nx: The number of cells in the x direction
@@ -647,6 +672,8 @@ def BoxMesh(nx, ny, nz, Lx, Ly, Lz, reorder=None, comm=COMM_WORLD):
     :arg Ly: The extent in the y direction
     :arg Lz: The extent in the z direction
     :kwarg reorder: (optional), should the mesh be reordered?
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -715,10 +742,10 @@ def BoxMesh(nx, ny, nz, Lx, Ly, Lz, reorder=None, comm=COMM_WORLD):
             if abs(face_coords[2] - Lz) < ztol and abs(face_coords[5] - Lz) < ztol and abs(face_coords[8] - Lz) < ztol:
                 plex.setLabelValue("boundary_ids", face, 6)
 
-    return mesh.Mesh(plex, reorder=reorder)
+    return mesh.Mesh(plex, reorder=reorder, partitioning=partitioning)
 
 
-def CubeMesh(nx, ny, nz, L, reorder=None, comm=COMM_WORLD):
+def CubeMesh(nx, ny, nz, L, reorder=None, partitioning=None, comm=COMM_WORLD):
     """Generate a mesh of a cube
 
     :arg nx: The number of cells in the x direction
@@ -726,6 +753,8 @@ def CubeMesh(nx, ny, nz, L, reorder=None, comm=COMM_WORLD):
     :arg nz: The number of cells in the z direction
     :arg L: The extent in the x, y and z directions
     :kwarg reorder: (optional), should the mesh be reordered?
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -738,16 +767,19 @@ def CubeMesh(nx, ny, nz, L, reorder=None, comm=COMM_WORLD):
     * 5: plane z == 0
     * 6: plane z == L
     """
-    return BoxMesh(nx, ny, nz, L, L, L, reorder=reorder, comm=comm)
+    return BoxMesh(nx, ny, nz, L, L, L, reorder=reorder, partitioning=partitioning,
+                   comm=comm)
 
 
-def UnitCubeMesh(nx, ny, nz, reorder=None, comm=COMM_WORLD):
+def UnitCubeMesh(nx, ny, nz, reorder=None, partitioning=None, comm=COMM_WORLD):
     """Generate a mesh of a unit cube
 
     :arg nx: The number of cells in the x direction
     :arg ny: The number of cells in the y direction
     :arg nz: The number of cells in the z direction
     :kwarg reorder: (optional), should the mesh be reordered?
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -760,10 +792,12 @@ def UnitCubeMesh(nx, ny, nz, reorder=None, comm=COMM_WORLD):
     * 5: plane z == 0
     * 6: plane z == 1
     """
-    return CubeMesh(nx, ny, nz, 1, reorder=reorder, comm=comm)
+    return CubeMesh(nx, ny, nz, 1, reorder=reorder, partitioning=partitioning,
+                    comm=comm)
 
 
 def IcosahedralSphereMesh(radius, refinement_level=0, degree=1, reorder=None,
+                          partitioning=None,
                           comm=COMM_WORLD):
     """Generate an icosahedral approximation to the surface of the
     sphere.
@@ -781,6 +815,8 @@ def IcosahedralSphereMesh(radius, refinement_level=0, degree=1, reorder=None,
     :kwarg degree: polynomial degree of coordinate space (defaults
         to 1: flat triangles)
     :kwarg reorder: (optional), should the mesh be reordered?
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
     """
@@ -835,7 +871,7 @@ def IcosahedralSphereMesh(radius, refinement_level=0, degree=1, reorder=None,
     coords = plex.getCoordinatesLocal().array.reshape(-1, 3)
     scale = (radius / np.linalg.norm(coords, axis=1)).reshape(-1, 1)
     coords *= scale
-    m = mesh.Mesh(plex, dim=3, reorder=reorder)
+    m = mesh.Mesh(plex, dim=3, reorder=reorder, partitioning=partitioning)
     if degree > 1:
         new_coords = function.Function(functionspace.VectorFunctionSpace(m, "CG", degree))
         new_coords.interpolate(ufl.SpatialCoordinate(m))
@@ -847,6 +883,7 @@ def IcosahedralSphereMesh(radius, refinement_level=0, degree=1, reorder=None,
 
 
 def UnitIcosahedralSphereMesh(refinement_level=0, degree=1, reorder=None,
+                              partitioning=None,
                               comm=COMM_WORLD):
     """Generate an icosahedral approximation to the unit sphere.
 
@@ -855,12 +892,14 @@ def UnitIcosahedralSphereMesh(refinement_level=0, degree=1, reorder=None,
     :kwarg degree: polynomial degree of coordinate space (defaults
         to 1: flat triangles)
     :kwarg reorder: (optional), should the mesh be reordered?
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
     """
     return IcosahedralSphereMesh(1.0, refinement_level=refinement_level,
                                  degree=degree, reorder=reorder,
-                                 comm=comm)
+                                 partitioning=partitioning, comm=comm)
 
 
 def _cubedsphere_cells_and_coords(radius, refinement_level):
@@ -991,7 +1030,7 @@ def _cubedsphere_cells_and_coords(radius, refinement_level):
 
 
 def CubedSphereMesh(radius, refinement_level=0, degree=1,
-                    reorder=None, comm=COMM_WORLD):
+                    reorder=None, partitioning=None, comm=COMM_WORLD):
     """Generate an cubed approximation to the surface of the
     sphere.
 
@@ -1000,6 +1039,10 @@ def CubedSphereMesh(radius, refinement_level=0, degree=1,
     :kwarg degree: polynomial degree of coordinate space (defaults
         to 1: bilinear quads)
     :kwarg reorder: (optional), should the mesh be reordered?
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
+    :kwarg comm: Optional communicator to build the mesh on (defaults to
+        COMM_WORLD).
     """
     if refinement_level < 0 or refinement_level % 1:
             raise RuntimeError("Number of refinements must be a non-negative integer")
@@ -1010,7 +1053,7 @@ def CubedSphereMesh(radius, refinement_level=0, degree=1,
     cells, coords = _cubedsphere_cells_and_coords(radius, refinement_level)
     plex = mesh._from_cell_list(2, cells, coords, comm)
 
-    m = mesh.Mesh(plex, dim=3, reorder=reorder)
+    m = mesh.Mesh(plex, dim=3, reorder=reorder, partitioning=partitioning)
 
     if degree > 1:
         new_coords = function.Function(functionspace.VectorFunctionSpace(m, "Q", degree))
@@ -1022,21 +1065,26 @@ def CubedSphereMesh(radius, refinement_level=0, degree=1,
     return m
 
 
-def UnitCubedSphereMesh(refinement_level=0, degree=1, reorder=None, comm=COMM_WORLD):
+def UnitCubedSphereMesh(refinement_level=0, degree=1, reorder=None,
+                        partitioning=None, comm=COMM_WORLD):
     """Generate a cubed approximation to the unit sphere.
 
     :kwarg refinement_level: optional number of refinements (0 is a cube).
     :kwarg degree: polynomial degree of coordinate space (defaults
         to 1: bilinear quads)
     :kwarg reorder: (optional), should the mesh be reordered?
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
     """
     return CubedSphereMesh(1.0, refinement_level=refinement_level,
-                           degree=degree, reorder=reorder, comm=comm)
+                           degree=degree, reorder=reorder,
+                           partitioning=partitioning, comm=comm)
 
 
-def TorusMesh(nR, nr, R, r, quadrilateral=False, reorder=None, comm=COMM_WORLD):
+def TorusMesh(nR, nr, R, r, quadrilateral=False, reorder=None,
+              partitioning=None, comm=COMM_WORLD):
     """Generate a toroidal mesh
 
     :arg nR: The number of cells in the major direction (min 3)
@@ -1045,6 +1093,8 @@ def TorusMesh(nR, nr, R, r, quadrilateral=False, reorder=None, comm=COMM_WORLD):
     :arg r: The minor radius
     :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
     :kwarg reorder: (optional), should the mesh be reordered
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
     """
@@ -1076,12 +1126,13 @@ def TorusMesh(nR, nr, R, r, quadrilateral=False, reorder=None, comm=COMM_WORLD):
         cells = cells[:, [0, 1, 3, 1, 2, 3]].reshape(-1, 3)
 
     plex = mesh._from_cell_list(2, cells, vertices, comm)
-    m = mesh.Mesh(plex, dim=3, reorder=reorder)
+    m = mesh.Mesh(plex, dim=3, reorder=reorder, partitioning=partitioning)
     return m
 
 
 def CylinderMesh(nr, nl, radius=1, depth=1, longitudinal_direction="z",
-                 quadrilateral=False, reorder=None, comm=COMM_WORLD):
+                 quadrilateral=False, reorder=None,
+                 partitioning=None, comm=COMM_WORLD):
     """Generates a cylinder mesh.
 
     :arg nr: number of cells the cylinder circumference should be
@@ -1094,6 +1145,8 @@ def CylinderMesh(nr, nl, radius=1, depth=1, longitudinal_direction="z",
     :kwarg longitudinal_direction: (option) direction for the
          longitudinal axis of the cylinder.
     :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -1157,11 +1210,12 @@ def CylinderMesh(nr, nl, radius=1, depth=1, longitudinal_direction="z",
                 # top of cylinder
                 plex.setLabelValue("boundary_ids", face, 2)
 
-    m = mesh.Mesh(plex, dim=3, reorder=reorder)
+    m = mesh.Mesh(plex, dim=3, reorder=reorder, partitioning=partitioning)
     return m
 
 
-def PartiallyPeriodicRectangleMesh(nx, ny, Lx, Ly, direction="x", quadrilateral=False, reorder=None, comm=COMM_WORLD):
+def PartiallyPeriodicRectangleMesh(nx, ny, Lx, Ly, direction="x", quadrilateral=False,
+                                   reorder=None, partitioning=None, comm=COMM_WORLD):
     """Generates RectangleMesh that is periodic in the x or y direction.
 
     :arg nx: The number of cells in the x direction
@@ -1171,6 +1225,8 @@ def PartiallyPeriodicRectangleMesh(nx, ny, Lx, Ly, direction="x", quadrilateral=
     :kwarg direction: The direction of the periodicity (default x).
     :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
     :kwarg reorder: (optional), should the mesh be reordered
+    :kwarg partitioning: specified cell partition in parallel (only
+        useful for debugging).
     :kwarg comm: Optional communicator to build the mesh on (defaults to
         COMM_WORLD).
 
@@ -1198,7 +1254,8 @@ def PartiallyPeriodicRectangleMesh(nx, ny, Lx, Ly, direction="x", quadrilateral=
 cells in each direction are not currently supported")
 
     m = CylinderMesh(na, nb, 1.0, 1.0, longitudinal_direction="z",
-                     quadrilateral=quadrilateral, reorder=reorder, comm=comm)
+                     quadrilateral=quadrilateral, reorder=reorder,
+                     partitioning=partitioning, comm=comm)
     coord_fs = VectorFunctionSpace(m, 'DG', 1, dim=2)
     old_coordinates = m.coordinates
     new_coordinates = Function(coord_fs)
