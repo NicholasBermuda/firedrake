@@ -251,15 +251,15 @@ def get_top_bottom_boundary_nodes(mesh, key, V, entity_dofs):
     _, mask, kind = key
     cell_node_list = V.cell_node_list
     offset = V.offset
-    if mesh.cell_set.constant_layers:
+    if mesh.variable_layers:
+        return extnum.top_bottom_boundary_nodes(mesh, cell_node_list,
+                                                entity_dofs, offset,
+                                                mask, kind)
+    else:
         nodes = cell_node_list[:, mask]
         if kind == "top":
             nodes = nodes + offset.take(mask)*(mesh.cell_set.layers - 2)
         return numpy.unique(nodes)
-    else:
-        return extnum.top_bottom_boundary_nodes(mesh, cell_node_list,
-                                                entity_dofs, offset,
-                                                mask, kind)
 
 
 @cached
@@ -270,15 +270,15 @@ def get_boundary_nodes(mesh, key, V):
         indices = mesh.exterior_facets.subset(sub_domain).indices
         return numpy.unique(nodes.take(indices, axis=0))
 
-    if mesh.cell_set.constant_layers:
+    if mesh.variable_layers:
+        return extnum.boundary_nodes(V, sub_domain, method)
+    else:
         nodes = V.exterior_facet_boundary_node_map(method).values_with_halo
         indices = mesh.exterior_facets.subset(sub_domain).indices
         base = nodes.take(indices, axis=0)
         offset = V.exterior_facet_boundary_node_map(method).offset
         return numpy.unique(numpy.concatenate([base + i * offset
                                                for i in range(mesh.cell_set.layers - 1)]))
-    else:
-        return extnum.boundary_nodes(V, sub_domain, method)
 
 
 def get_max_work_functions(V):
@@ -466,7 +466,7 @@ class FunctionSpaceData(object):
                                   dtype=numpy.uintc)
         if self.extruded:
             offset = self.offset[boundary_dofs[0]]
-            if not self.mesh.cell_set.constant_layers:
+            if self.mesh.variable_layers:
                 raise NotImplementedError("Variable layer case not handled, should never reach here")
         else:
             offset = None
