@@ -117,9 +117,11 @@ class HybridizationPC(PCBase):
             trace_bcs = [DirichletBC(TraceSpace, Constant(0.0), "on_boundary")]
             K = Tensor(gammar('+') * ufl.dot(sigma, n) * ufl.dS)
 
-        # If boundary conditions are contained in the ImplicitMatrixContext:
+        # Boundary data functions
         if self.cxt.row_bcs:
-            raise NotImplementedError("Strong BCs not currently handled. Try imposing them weakly.")
+            self._xbc = Function(V)
+        if self.cxt.col_bcs:
+            self._ybc = Function(V)
 
         # Assemble the Schur complement operator and right-hand side
         self.schur_rhs = Function(TraceSpace)
@@ -251,8 +253,13 @@ class HybridizationPC(PCBase):
         Lastly, we project the broken solutions into the mimetic
         non-broken finite element space.
         """
+
         with self.unbroken_rhs.dat.vec as v:
             x.copy(v)
+
+        # Zero out nodes corresponding to boundary data in the residual
+        for bc in self.cxt.col_bcs:
+            bc.zero(self.unbroken_rhs)
 
         # Transfer unbroken_rhs into broken_rhs
         unbroken_scalar_data = self.unbroken_rhs.split()[self.pidx]
@@ -265,8 +272,8 @@ class HybridizationPC(PCBase):
 
         # Solve the system for the Lagrange multipliers
         with self.schur_rhs.dat.vec_ro as b:
-            with self.trace_solution.dat.vec as x:
-                self.ksp.solve(b, x)
+            with self.trace_solution.dat.vec as xt:
+                self.ksp.solve(b, xt)
 
         # Reconstruct the unknowns
         self._reconstruct()
@@ -276,6 +283,14 @@ class HybridizationPC(PCBase):
         unbroken_pressure = self.unbroken_solution.split()[self.pidx]
         broken_pressure.dat.copy(unbroken_pressure.dat)
         self.projector.project()
+
+        # Now we have the unconstrained solution. We set the
+        # essential boundary data values in the result
+        if self.cxt.row_bcs:
+            with self._xbc.dat.vec as v:
+                x.copy(v)
+            for bc in self.cxt.row_bcs:
+                bc.set(self.unbroken_solution, self._xbc)
 
         with self.unbroken_solution.dat.vec_ro as v:
             v.copy(y)
