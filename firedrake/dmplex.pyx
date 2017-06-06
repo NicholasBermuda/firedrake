@@ -777,8 +777,21 @@ def get_cell_markers(PETSc.DM plex, PETSc.Section cell_numbering,
     if not plex.hasLabel("Cell Sets"):
         return np.empty(0, dtype=IntType)
     vals = plex.getLabelIdIS("Cell Sets").indices
-    if subdomain_id not in vals:
+    comm = plex.comm.tompi4py()
+
+    def merge_ids(x, y, datatype):
+        return x.union(y)
+
+    op = MPI.Op.Create(merge_ids, commute=True)
+
+    all_ids = np.asarray(sorted(comm.allreduce(set(vals), op=op)),
+                            dtype=IntType)
+    op.Free()
+    if subdomain_id not in all_ids:
         raise ValueError("Invalid subdomain_id %d not in %s" % (subdomain_id, vals))
+
+    if subdomain_id not in vals:
+        return np.empty(0, dtype=IntType)
 
     indices = plex.getStratumIS("Cell Sets", subdomain_id).indices
     cells = np.empty(indices.shape[0], dtype=IntType)
