@@ -2069,7 +2069,7 @@ def set_adjacency_callback(PETSc.DM dm not None):
     for p in range(nleaves):
         CHKERR(DMLabelSetValue(label, ilocal[p], 1))
     CHKERR(DMLabelCreateIndex(label, fStart, fEnd))
-    CHKERR(DMPlexSetAdjacencyUser(dm.dm, DMPlexGetAdjacency_Facet_Support, <void *>label))
+    CHKERR(DMPlexSetAdjacencyUser(dm.dm, DMPlexGetAdjacency_Facet_Support, NULL)) # <void *>label))
 
 
 def clear_adjacency_callback(PETSc.DM dm not None):
