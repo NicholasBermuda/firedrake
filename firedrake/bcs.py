@@ -7,6 +7,7 @@ from ufl.algorithms.analysis import has_type
 
 import pyop2 as op2
 from pyop2.profiling import timed_function
+from pyop2.datatypes import IntType
 from pyop2 import exceptions
 
 import firedrake.expression as expression
@@ -164,9 +165,9 @@ class DirichletBC(object):
 
         fs = self._function_space
         if self.sub_domain == "bottom":
-            return fs.bottom_nodes(method=self.method)
+            local_indices = fs.bottom_nodes(method=self.method)
         elif self.sub_domain == "top":
-            return fs.top_nodes(method=self.method)
+            local_indices = fs.top_nodes(method=self.method)
         else:
             if fs.extruded:
                 base_maps = fs.exterior_facet_boundary_node_map(
@@ -174,13 +175,22 @@ class DirichletBC(object):
                     fs._mesh._base_mesh.exterior_facets.subset(self.sub_domain).indices,
                     axis=0)
                 facet_offset = fs.exterior_facet_boundary_node_map(self.method).offset
-                return np.unique(np.concatenate([base_maps + i * facet_offset
-                                                 for i in range(fs._mesh.layers - 1)]))
-            return np.unique(
-                fs.exterior_facet_boundary_node_map(
-                    self.method).values_with_halo.take(
-                    fs._mesh.exterior_facets.subset(self.sub_domain).indices,
-                    axis=0))
+                local_indices = np.unique(np.concatenate([base_maps + i * facet_offset
+                                                          for i in range(fs._mesh.layers - 1)]))
+            else:
+                local_indices = np.unique(
+                    fs.exterior_facet_boundary_node_map(
+                        self.method).values_with_halo.take(
+                            fs._mesh.exterior_facets.subset(self.sub_domain).indices,
+                            axis=0))
+        # Now determine global indices.  Simple-minded GtoL right now,
+        # could be improved probably
+        d = op2.Dat(fs.dof_dset.set, dtype=np.int32)
+        d.data_with_halos[local_indices] = 1
+        d.global_to_local_begin(op2.READ)
+        d.global_to_local_end(op2.READ)
+        indices, = np.where(d.data_ro_with_halos == 1)
+        return indices.astype(IntType)
 
     @utils.cached_property
     def node_set(self):
