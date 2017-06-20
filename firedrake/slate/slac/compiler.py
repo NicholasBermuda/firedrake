@@ -512,24 +512,7 @@ def auxiliary_temporaries(builder, declared_temps):
     """
     aux_statements = []
     for exp in builder.aux_exprs:
-        if isinstance(exp, Inverse):
-            if builder._ref_counts[exp] > 1:
-                # Get the temporary for the particular expression
-                result = metaphrase_slate_to_cpp(exp, declared_temps)
-
-                # Now we use the generated result and assign the value to the
-                # corresponding temporary.
-                temp = ast.Symbol("auxT%d" % len(declared_temps))
-                shape = exp.shape
-                aux_statements.append(ast.Decl(eigen_matrixbase_type(shape),
-                                               temp))
-                aux_statements.append(ast.FlatBlock("%s.setZero();\n" % temp))
-                aux_statements.append(ast.Assign(temp, result))
-
-                # Update declared temps
-                declared_temps[exp] = temp
-
-        elif isinstance(exp, Action):
+        if isinstance(exp, Action):
             # Action computations are relatively inexpensive, so
             # we don't waste memory space on creating temps for
             # these expressions. However, we must create a temporary
@@ -581,9 +564,23 @@ def auxiliary_temporaries(builder, declared_temps):
                 # Update declared temporaries with the coefficient
                 declared_temps[actee] = ctemp
         else:
-            raise NotImplementedError(
-                "Auxiliary expr type %s not currently implemented." % type(exp)
-            )
+            # All other expressions are handled depending on reference
+            # count
+            if builder._ref_counts[exp] > 1:
+                # Get the temporary for the particular expression
+                result = metaphrase_slate_to_cpp(exp, declared_temps)
+
+                # Now we use the generated result and assign the value to the
+                # corresponding temporary.
+                temp = ast.Symbol("auxT%d" % len(declared_temps))
+                shape = exp.shape
+                aux_statements.append(ast.Decl(eigen_matrixbase_type(shape),
+                                               temp))
+                aux_statements.append(ast.FlatBlock("%s.setZero();\n" % temp))
+                aux_statements.append(ast.Assign(temp, result))
+
+                # Update declared temps
+                declared_temps[exp] = temp
 
     return aux_statements
 
