@@ -7,7 +7,8 @@ from coffee import base as ast
 from firedrake.slate.slate import (TensorBase, Tensor, TensorOp,
                                    Action, Inverse)
 from firedrake.slate.slac.utils import (Transformer, traverse_dags,
-                                        collect_reference_count)
+                                        collect_reference_count,
+                                        count_operands)
 from firedrake.utils import cached_property
 
 from ufl import MixedElement
@@ -45,7 +46,7 @@ class KernelBuilder(object):
         # Initialize temporaries and any auxiliary temporaries
         temps, aux_exprs = generate_expr_data(expression)
         self.temps = temps
-        self.aux_exprs = aux_exprs
+        self.aux_exprs = sorted(aux_exprs, key=lambda x: count_operands(x))
 
         # Collect the reference count of operands in auxiliary expressions
         self._ref_counts = collect_reference_count([expression])
@@ -214,10 +215,9 @@ def generate_expr_data(expr):
 
         elif isinstance(tensor, TensorOp):
             # For Action, we need to declare a temporary later on for the
-            # acting coefficient. For inverses, we may declare additional
-            # temporaries (depending on reference count).
-            if isinstance(tensor, (Action, Inverse)):
-                aux_exprs.append(tensor)
+            # acting coefficient. We may also declare additional
+            # temporaries depending on reference count.
+            aux_exprs.append(tensor)
 
     # Aux expressions are visited pre-order. We want to declare as if we'd
     # visited post-order (child temporaries first), so reverse.
