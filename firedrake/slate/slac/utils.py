@@ -138,6 +138,21 @@ class Transformer(Visitor):
         return SymbolWithFuncallIndexing(o.symbol, o.rank, o.offset)
 
 
+def count_operands(expr):
+    """Counts the total number of nodes in a given Slate expression.
+    The expressions are treated like a tree, so we include duplicated
+    expressions (if any).
+
+    :arg expr: a Slate expression.
+    """
+    count = 1
+
+    for op in expr.operands:
+        count += count_operands(op)
+
+    return count
+
+
 # Thanks, Miklos!
 def traverse_dags(expr_dags):
     """Traverses a DAG and returns the unique operands associated
