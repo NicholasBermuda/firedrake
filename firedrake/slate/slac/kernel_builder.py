@@ -4,8 +4,7 @@ from collections import OrderedDict
 
 from coffee import base as ast
 
-from firedrake.slate.slate import (TensorBase, Tensor, TensorOp,
-                                   Action, Inverse)
+from firedrake.slate.slate import (TensorBase, Tensor, TensorOp, Action)
 from firedrake.slate.slac.utils import (Transformer, traverse_dags,
                                         collect_reference_count,
                                         count_operands)
@@ -44,12 +43,18 @@ class KernelBuilder(object):
         self._is_finalized = False
 
         # Initialize temporaries and any auxiliary temporaries
-        temps, aux_exprs = generate_expr_data(expression)
+        temps, tensor_ops = generate_expr_data(expression)
         self.temps = temps
-        self.aux_exprs = sorted(aux_exprs, key=lambda x: count_operands(x))
 
         # Collect the reference count of operands in auxiliary expressions
-        self._ref_counts = collect_reference_count([expression])
+        ref_counts = collect_reference_count([expression])
+        aux_exprs = []
+        for op in tensor_ops:
+            # Actions will always need a temporary to store the
+            # acting coefficient
+            if ref_counts[op] > 1 or isinstance(op, Action):
+                aux_exprs.append(op)
+        self.aux_exprs = aux_exprs
 
     @property
     def integral_type(self):
@@ -202,13 +207,13 @@ def generate_expr_data(expr):
 
     :arg expression: a :class:`slate.TensorBase` object.
 
-    Returns: the terminal temporaries map and auxiliary temporaries.
+    Returns: the terminal temporaries map and a list of tensor operation nodes.
     """
     # Prepare temporaries map and auxiliary expressions list
     # NOTE: Ordering here matters, especially when running
     # Slate in parallel.
     temps = OrderedDict()
-    aux_exprs = []
+    tensor_ops = []
     for tensor in traverse_dags([expr]):
         if isinstance(tensor, Tensor):
             temps.setdefault(tensor, ast.Symbol("T%d" % len(temps)))
@@ -217,10 +222,9 @@ def generate_expr_data(expr):
             # For Action, we need to declare a temporary later on for the
             # acting coefficient. We may also declare additional
             # temporaries depending on reference count.
-            aux_exprs.append(tensor)
+            tensor_ops.append(tensor)
 
-    # Aux expressions are visited pre-order. We want to declare as if we'd
-    # visited post-order (child temporaries first), so reverse.
-    aux_exprs = list(OrderedDict.fromkeys(reversed(aux_exprs)))
+    # Sort by number of operands
+    tensor_ops = sorted(tensor_ops, key=lambda x: count_operands(x))
 
-    return temps, aux_exprs
+    return temps, tensor_ops

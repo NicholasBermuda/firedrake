@@ -209,9 +209,7 @@ def compile_expression(slate_expr, tsfc_parameters=None):
         inc_dir = list(set(incl) - set(inc))
         inc.extend(inc_dir)
 
-    # Now we handle any terms that require auxiliary temporaries,
-    # such as inverses, transposes and actions of a tensor on a
-    # coefficient
+    # Now we handle any terms that require auxiliary temporaries
     if builder.aux_exprs:
         # The declared temps will be updated within this method
         aux_statements = auxiliary_temporaries(builder, declared_temps)
@@ -564,9 +562,7 @@ def auxiliary_temporaries(builder, declared_temps):
                 # Update declared temporaries with the coefficient
                 declared_temps[actee] = ctemp
         else:
-            # All other expressions are handled depending on reference
-            # count
-            if builder._ref_counts[exp] > 1:
+            if exp not in declared_temps:
                 # Get the temporary for the particular expression
                 result = metaphrase_slate_to_cpp(exp, declared_temps)
 
