@@ -99,6 +99,20 @@ def test_aggressive_unaryop_nesting():
     assert np.allclose(assemble(foo).dat.data, np.ones(V.node_count))
 
 
+def test_aux_temps():
+    V = FunctionSpace(UnitSquareMesh(1, 1), "DG", 1)
+    f = Function(V)
+    g = Function(V)
+    f.assign(1.0)
+    g.assign(0.5)
+    u = TrialFunction(V)
+    v = TestFunction(V)
+
+    A = Tensor(u*v*dx)
+    B = Tensor(2.0*u*v*dx)
+    foo = A.inv * B.inv * A + B.inv * (A.inv * B.inv * A)
+
+
 if __name__ == '__main__':
     import os
     pytest.main(os.path.abspath(__file__))
