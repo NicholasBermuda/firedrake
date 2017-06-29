@@ -297,7 +297,7 @@ class HybridizationPC(PCBase):
         """
 
         with timed_region("HybridBreak"):
-            with self.unbroken_residual.dat.vec as v:
+            with self.unbroken_residual.dat.vec_wo as v:
                 x.copy(v)
 
             # Transfer unbroken_rhs into broken_rhs
@@ -314,7 +314,7 @@ class HybridizationPC(PCBase):
             # Once `g` is obtained, we take the inner product against broken
             # HDiv test functions to obtain a broken residual.
             with self.unbroken_residual.split()[self.vidx].dat.vec_ro as r:
-                with self._primal_r.dat.vec as g:
+                with self._primal_r.dat.vec_wo as g:
                     self.hdiv_mass_ksp.solve(r, g)
 
         with timed_region("HybridRHS"):
@@ -327,7 +327,11 @@ class HybridizationPC(PCBase):
         with timed_region("HybridSolve"):
             # Solve the system for the Lagrange multipliers
             with self.schur_rhs.dat.vec_ro as b:
-                with self.trace_solution.dat.vec as x_trace:
+                if self.trace_ksp.getInitialGuessNonzero():
+                    acc = self.trace_solution.dat.vec
+                else:
+                    acc = self.trace_solution.dat.vec_wo
+                with acc as x_trace:
                     self.trace_ksp.solve(b, x_trace)
 
         # Reconstruct the unknowns
@@ -349,7 +353,7 @@ class HybridizationPC(PCBase):
             else:
                 self._assemble_projection_rhs()
                 with self._projection_rhs.dat.vec_ro as b_proj:
-                    with self.unbroken_solution.split()[self.vidx].dat.vec as sol:
+                    with self.unbroken_solution.split()[self.vidx].dat.vec_wo as sol:
                         self.hdiv_projection_ksp.solve(b_proj, sol)
 
             with self.unbroken_solution.dat.vec_ro as v:
@@ -411,7 +415,7 @@ def create_schur_nullspace(P, forward, V, V_d, TraceSpace, comm):
     forward_action = forward * tmp_b
     new_vecs = []
     for v in vecs:
-        with tmp.dat.vec as t:
+        with tmp.dat.vec_wo as t:
             v.copy(t)
 
         project(tmp, tmp_b)
